@@ -14,7 +14,7 @@ from sklearn.impute import SimpleImputer# Imputer, since SVC() can't handle non 
 from sklearn.metrics import accuracy_score
 
 # Read the CSV file
-spam_data = pd.read_csv('/Users/sebastianlindgren/Documents/FacebookSpamBot/Facebook Spam Dataset.csv')
+spam_data = pd.read_csv('/Users/sebastianlindgren/Documents/Fork_Projects/FacebookSpamBot/Facebook Spam Dataset.csv')
 
 # Check for missing values
 if spam_data.isnull().any().any():

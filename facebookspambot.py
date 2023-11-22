@@ -108,6 +108,8 @@ plt.show()
 
 # Plot to see where the elbow is. Used to decide number of principal components.
 # Link for explaining: https://sanchitamangale12.medium.com/scree-plot-733ed72c8608
+# Thorugh the graph we can tell that 80% of the variance occurs in the first 4-5 principal components.
+# This mean we could regulate the amount of principal components to 4 or 5 instead of the original amount of 10.
 
 explained_variance_ratio = pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].explained_variance_ratio_
 cumulative_explained_variance = explained_variance_ratio.cumsum()

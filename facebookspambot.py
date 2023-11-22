@@ -3,6 +3,9 @@ from sklearn.naive_bayes import MultinomialNB # Naive Bayes
 from sklearn.tree import DecisionTreeClassifier # Decision Trees
 from sklearn.dummy import DummyClassifier # Dummy Classifier
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.decomposition import PCA # PCA
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
@@ -38,13 +41,16 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 # Create a pipeline with ColumnTransformer for different feature types
 pipeline = Pipeline([
     ('features', ColumnTransformer([
-        ('numeric', StandardScaler(), feature_columns)
+        ('numeric', Pipeline([
+            ('imputer', SimpleImputer(strategy='mean')),
+            ('scaler', StandardScaler()),
+            ('pca', PCA(n_components=10))
+        ]), feature_columns)
     ])),
-    ('imputer', SimpleImputer(strategy='mean')),  # Impute missing values with the mean
     ('classifier', SVC())
 ])
 
-# Train the model using the pipeline
+# Fit the pipeline
 pipeline.fit(X_train, y_train)
 
 # Predictions on the test set
@@ -71,7 +77,7 @@ for feature_category in feature_columns:
 accuracy = accuracy_score(y_test, y_pred)
 print("Model Accuracy:", accuracy)
 
-# For all features
+# PCA and heatmap
 
 # Predictions for all examples in the dataset
 all_predictions = pipeline.predict(X)
@@ -79,25 +85,37 @@ all_predictions = pipeline.predict(X)
 # Add the predicted labels to the original DataFrame
 spam_data['Predicted_Label'] = all_predictions
 
-random_subset = spam_data.sample(n=10, random_state=42) # To write out only a handful (n) of the 600 examples.
+# Ensure there are no missing values in the dataset
+spam_data_no_missing = spam_data.dropna()
 
-# Print details for 50 random examples in the dataset
-print("Details for Each Random Example:")
-for index, row in random_subset.iterrows():
-    true_label = row['Label']
-    predicted_label = row['Predicted_Label']
-    
-    print(f"Example {index + 1}:")
-    print(f"  True Label: {true_label}")
-    print(f"  Predicted Label: {predicted_label}")
-    
-    for feature_category in feature_columns:
-        feature_value = row[feature_category]
-        print(f"  {feature_category}: {feature_value}")
+# Get the PCA-transformed data for the entire dataset after handling missing values
+all_data_pca = pipeline.named_steps['features'].transform(spam_data_no_missing)
 
-    print("---")
+# Scree plot to show explained variance for the entire dataset
+explained_variance_ratio = pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].explained_variance_ratio_
+cumulative_explained_variance = explained_variance_ratio.cumsum()
 
-# Evaluate the overall model accuracy
-overall_accuracy = accuracy_score(spam_data['Label'], all_predictions)
-print("Overall Model Accuracy:", overall_accuracy)
+# Biplot to visualize feature contributions to principal components for the entire dataset
+pca_components = pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].components_
 
+pca_loadings_df = pd.DataFrame(pca_components.T, columns=[f'PC{i+1}' for i in range(pca_components.shape[0])], index=feature_columns)
+
+# Plot a heatmap of the PCA loadings
+plt.figure(figsize=(12, 8))
+sns.heatmap(pca_loadings_df, cmap='coolwarm', annot=True, fmt=".2f", linewidths=.5)
+plt.title('PCA Loadings - Heatmap of Feature Contributions to Principal Components')
+plt.show()
+
+# Plot to see where the elbow is. Used to decide number of principal components.
+# Link for explaining: https://sanchitamangale12.medium.com/scree-plot-733ed72c8608
+
+explained_variance_ratio = pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].explained_variance_ratio_
+cumulative_explained_variance = explained_variance_ratio.cumsum()
+
+plt.figure(figsize=(10, 6))
+plt.plot(range(1, len(cumulative_explained_variance) + 1), cumulative_explained_variance, marker='o', linestyle='--')
+plt.title('Scree Plot - Cumulative Explained Variance')
+plt.xlabel('Number of Principal Components')
+plt.ylabel('Cumulative Explained Variance')
+plt.grid(True)
+plt.show()

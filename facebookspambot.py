@@ -1,8 +1,10 @@
 # Dataset from: https://www.kaggle.com/datasets/khajahussainsk/facebook-spam-dataset/
+# Importing classifiers from libraries
 from sklearn.naive_bayes import MultinomialNB # Naive Bayes
 from sklearn.tree import DecisionTreeClassifier # Decision Trees
 from sklearn.dummy import DummyClassifier # Dummy Classifier
 
+# Importing libraries
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.decomposition import PCA # PCA
@@ -13,10 +15,11 @@ from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
-from sklearn.impute import SimpleImputer# Imputer, since SVC() can't handle non existing values.
+from sklearn.impute import SimpleImputer# Imputer, since SVC() can't handle non-existing values.
 from sklearn.metrics import accuracy_score
 
-# Read the CSV file
+# ---------------------------------------------------------------
+# Read dataset
 spam_data = pd.read_csv('/Users/sebastianlindgren/Documents/Fork_Projects/FacebookSpamBot/Facebook Spam Dataset.csv')
 
 # Check for missing values
@@ -35,10 +38,10 @@ y = spam_data[target_column]
 # Replace numerical labels with "spam" and "not spam"
 y.replace({0: 'not spam', 1: 'spam'}, inplace=True)
 
-# Split the data into training and testing sets
+# Split the data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Create a pipeline with ColumnTransformer for different feature types
+# Pipeline with ColumnTransformer for different feature types
 pipeline = Pipeline([
     ('features', ColumnTransformer([
         ('numeric', Pipeline([
@@ -47,7 +50,7 @@ pipeline = Pipeline([
             ('pca', PCA(n_components=10))
         ]), feature_columns)
     ])),
-    ('classifier', SVC())
+    ('classifier', SVC(kernel='linear'))
 ])
 
 # Fit the pipeline
@@ -73,10 +76,54 @@ for feature_category in feature_columns:
         print(f"  Predicted Label: {predicted_label}")
         print("---")
 
-# Evaluate the model accuracy
+# Model accuracy
 accuracy = accuracy_score(y_test, y_pred)
 print("Model Accuracy:", accuracy)
 
+# ---------------------------------------------------------------
+# Feature importancy
+
+# Use a decision tree-based classifier to extract feature importances
+# Tried with SVM before but couldn't handle it since it worked with different array lengths.
+tree_classifier = DecisionTreeClassifier(random_state=42)
+tree_classifier.fit(X_train, y_train)
+
+# Feature importances and feature names
+feature_importances = tree_classifier.feature_importances_
+feature_names = X.columns
+
+# DataFrame to display feature importances
+feature_importance_df = pd.DataFrame({'Feature': feature_names, 'Importance': feature_importances})
+
+# Features by importance
+feature_importance_df = feature_importance_df.sort_values(by='Importance', ascending=False)
+
+print("Feature Importances:")
+print(feature_importance_df)
+
+# Select the top features
+threshold = 0.01  # Adjust the threshold as needed
+top_features = feature_importance_df[feature_importance_df['Importance'] > threshold]['Feature'].tolist()
+
+# New pipeline with only the top features
+pipeline_top_features = Pipeline([
+    ('features', ColumnTransformer([
+        ('numeric', Pipeline([
+            ('imputer', SimpleImputer(strategy='mean')),
+            ('scaler', StandardScaler())
+        ]), top_features)
+    ])),
+    ('classifier', SVC(kernel='linear'))
+])
+
+pipeline_top_features.fit(X_train, y_train)
+
+y_pred_top_features = pipeline_top_features.predict(X_test)
+
+# Model accuracy with only top features
+accuracy_top_features = accuracy_score(y_test, y_pred_top_features)
+print("Model Accuracy with Top Features:", accuracy_top_features)
+# ---------------------------------------------------------------
 # PCA and heatmap
 
 # Predictions for all examples in the dataset
@@ -85,13 +132,14 @@ all_predictions = pipeline.predict(X)
 # Add the predicted labels to the original DataFrame
 spam_data['Predicted_Label'] = all_predictions
 
-# Ensure there are no missing values in the dataset
+# Check for no missing values
 spam_data_no_missing = spam_data.dropna()
 
-# Get the PCA-transformed data for the entire dataset after handling missing values
+# Get the PCA-transformed data for the entire dataset
 all_data_pca = pipeline.named_steps['features'].transform(spam_data_no_missing)
 
 # Scree plot to show explained variance for the entire dataset
+# Scree plot is used to see elbow point
 explained_variance_ratio = pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].explained_variance_ratio_
 cumulative_explained_variance = explained_variance_ratio.cumsum()
 
@@ -100,16 +148,16 @@ pca_components = pipeline.named_steps['features'].transformers_[0][1].named_step
 
 pca_loadings_df = pd.DataFrame(pca_components.T, columns=[f'PC{i+1}' for i in range(pca_components.shape[0])], index=feature_columns)
 
-# Plot a heatmap of the PCA loadings
+# Heatmap
 plt.figure(figsize=(12, 8))
 sns.heatmap(pca_loadings_df, cmap='coolwarm', annot=True, fmt=".2f", linewidths=.5)
 plt.title('PCA Loadings - Heatmap of Feature Contributions to Principal Components')
 plt.show()
 
-# Plot to see where the elbow is. Used to decide number of principal components.
+# Plot to see where the elbow is. Used to decide the number of principal components.
 # Link for explaining: https://sanchitamangale12.medium.com/scree-plot-733ed72c8608
-# Thorugh the graph we can tell that 80% of the variance occurs in the first 4-5 principal components.
-# This mean we could regulate the amount of principal components to 4 or 5 instead of the original amount of 10.
+# Through the graph, we can tell that 80% of the variance occurs in the first 4-5 principal components.
+# This means we could regulate the amount of principal components to 4 or 5 instead of the original amount of 10.
 
 explained_variance_ratio = pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].explained_variance_ratio_
 cumulative_explained_variance = explained_variance_ratio.cumsum()

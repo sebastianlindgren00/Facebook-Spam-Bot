@@ -1,8 +1,9 @@
 # Dataset from: https://www.kaggle.com/datasets/khajahussainsk/facebook-spam-dataset/
 # Importing classifiers from libraries
-from sklearn.naive_bayes import MultinomialNB # Naive Bayes
+from sklearn.naive_bayes import GaussianNB # Gaussian NB, Multinomial can't accept negative values.
 from sklearn.tree import DecisionTreeClassifier # Decision Trees
 from sklearn.dummy import DummyClassifier # Dummy Classifier
+from sklearn.svm import SVC # SVM
 
 # Importing libraries
 import matplotlib.pyplot as plt
@@ -13,7 +14,6 @@ from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.impute import SimpleImputer# Imputer, since SVC() can't handle non-existing values.
 from sklearn.metrics import accuracy_score
@@ -41,44 +41,88 @@ y.replace({0: 'not spam', 1: 'spam'}, inplace=True)
 # Split the data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
-# Pipeline with ColumnTransformer for different feature types
-pipeline = Pipeline([
+# Dummy Classifier
+dummy_pipeline = Pipeline([
+    ('features', ColumnTransformer([
+        ('numeric', Pipeline([
+            ('imputer', SimpleImputer(strategy='mean')),
+            ('scaler', StandardScaler())
+        ]), feature_columns)
+    ])),
+    ('classifier', DummyClassifier(strategy='most_frequent'))  # You can adjust the strategy as needed
+])
+
+dummy_pipeline.fit(X_train, y_train)
+y_pred_dummy = dummy_pipeline.predict(X_test)
+accuracy_dummy = accuracy_score(y_test, y_pred_dummy)
+print("Dummy Classifier Accuracy:", accuracy_dummy)
+
+# Gaussian Naive Bayes
+gnb_pipeline = Pipeline([
+    ('features', ColumnTransformer([
+        ('numeric', Pipeline([
+            ('imputer', SimpleImputer(strategy='mean')),
+            ('scaler', StandardScaler())
+        ]), feature_columns)
+    ])),
+    ('classifier', GaussianNB())
+])
+
+gnb_pipeline.fit(X_train, y_train)
+y_pred_gnb = gnb_pipeline.predict(X_test)
+accuracy_gnb = accuracy_score(y_test, y_pred_gnb)
+print("Gaussian Naive Bayes Accuracy:", accuracy_gnb)
+
+# Random Forest Classifier
+from sklearn.ensemble import RandomForestClassifier
+rf_pipeline = Pipeline([
+    ('features', ColumnTransformer([
+        ('numeric', Pipeline([
+            ('imputer', SimpleImputer(strategy='mean')),
+            ('scaler', StandardScaler())
+        ]), feature_columns)
+    ])),
+    ('classifier', RandomForestClassifier(random_state=42))
+])
+
+rf_pipeline.fit(X_train, y_train)
+y_pred_rf = rf_pipeline.predict(X_test)
+accuracy_rf = accuracy_score(y_test, y_pred_rf)
+print("Random Forest Accuracy:", accuracy_rf)
+
+# K-Nearest Neighbors (KNN) Classifier
+from sklearn.neighbors import KNeighborsClassifier
+knn_pipeline = Pipeline([
+    ('features', ColumnTransformer([
+        ('numeric', Pipeline([
+            ('imputer', SimpleImputer(strategy='mean')),
+            ('scaler', StandardScaler())
+        ]), feature_columns)
+    ])),
+    ('classifier', KNeighborsClassifier())
+])
+
+knn_pipeline.fit(X_train, y_train)
+y_pred_knn = knn_pipeline.predict(X_test)
+accuracy_knn = accuracy_score(y_test, y_pred_knn)
+print("K-Nearest Neighbors Accuracy:", accuracy_knn)
+
+# SVM (Linear)
+svm_pipeline = Pipeline([
     ('features', ColumnTransformer([
         ('numeric', Pipeline([
             ('imputer', SimpleImputer(strategy='mean')),
             ('scaler', StandardScaler()),
-            ('pca', PCA(n_components=10))
+            ('pca', PCA(n_components=6))  # Add PCA here with the appropriate number of components
         ]), feature_columns)
     ])),
     ('classifier', SVC(kernel='linear'))
 ])
 
-# Fit the pipeline
-pipeline.fit(X_train, y_train)
-
-# Predictions on the test set
-y_pred = pipeline.predict(X_test)
-
-# Print examples for each feature category
-for feature_category in feature_columns:
-    print(f"Examples for {feature_category}:")
-    category_indices = X_test.index[X_test[feature_category].notnull()]
-    
-    for i in range(min(1, len(category_indices))): # Adjust number to change amount of examples.
-        index = category_indices[i]
-        true_label = y_test.loc[index]
-        predicted_label = y_pred[index]
-        feature_value = X_test.loc[index, feature_category]
-        
-        print(f"Example {i + 1}:")
-        print(f"  {feature_category}: {feature_value}")
-        print(f"  True Label: {true_label}")
-        print(f"  Predicted Label: {predicted_label}")
-        print("---")
-
-# Model accuracy
-accuracy = accuracy_score(y_test, y_pred)
-print("Model Accuracy:", accuracy)
+svm_pipeline.fit(X_train, y_train)
+y_pred_svm = svm_pipeline.predict(X_test)
+accuracy_svm = accuracy_score(y_test, y_pred_svm)
+print("SVM (Linear) Accuracy:", accuracy_svm)
 
 # ---------------------------------------------------------------
 # Feature importancy
@@ -127,7 +171,7 @@ print("Model Accuracy with Top Features:", accuracy_top_features)
 # PCA and heatmap
 
 # Predictions for all examples in the dataset
-all_predictions = pipeline.predict(X)
+all_predictions = svm_pipeline.predict(X)
 
 # Add the predicted labels to the original DataFrame
 spam_data['Predicted_Label'] = all_predictions
@@ -136,15 +180,16 @@ spam_data['Predicted_Label'] = all_predictions
 spam_data_no_missing = spam_data.dropna()
 
 # Get the PCA-transformed data for the entire dataset
-all_data_pca = pipeline.named_steps['features'].transform(spam_data_no_missing)
+all_data_pca = svm_pipeline.named_steps['features'].transform(spam_data_no_missing)
 
 # Scree plot to show explained variance for the entire dataset
 # Scree plot is used to see elbow point
-explained_variance_ratio = pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].explained_variance_ratio_
+explained_variance_ratio = svm_pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].explained_variance_ratio_
+
 cumulative_explained_variance = explained_variance_ratio.cumsum()
 
 # Biplot to visualize feature contributions to principal components for the entire dataset
-pca_components = pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].components_
+pca_components = svm_pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].components_
 
 pca_loadings_df = pd.DataFrame(pca_components.T, columns=[f'PC{i+1}' for i in range(pca_components.shape[0])], index=feature_columns)
 
@@ -159,7 +204,7 @@ plt.show()
 # Through the graph, we can tell that 80% of the variance occurs in the first 4-5 principal components.
 # This means we could regulate the amount of principal components to 4 or 5 instead of the original amount of 10.
 
-explained_variance_ratio = pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].explained_variance_ratio_
+explained_variance_ratio = svm_pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].explained_variance_ratio_
 cumulative_explained_variance = explained_variance_ratio.cumsum()
 
 plt.figure(figsize=(10, 6))

@@ -82,7 +82,7 @@ rf_pipeline = Pipeline([
             ('scaler', StandardScaler())
         ]), feature_columns)
     ])),
-    ('classifier', RandomForestClassifier(random_state=42))
+    ('classifier', RandomForestClassifier(random_state=0))
 ])
 
 rf_pipeline.fit(X_train, y_train)
@@ -146,7 +146,7 @@ print("Feature Importances:")
 print(feature_importance_df)
 
 # Select the top features
-threshold = 0.01  # Adjust the threshold as needed
+threshold = 0.7  # Adjust the threshold as needed
 top_features = feature_importance_df[feature_importance_df['Importance'] > threshold]['Feature'].tolist()
 
 # New pipeline with only the top features
@@ -201,8 +201,6 @@ plt.show()
 
 # Plot to see where the elbow is. Used to decide the number of principal components.
 # Link for explaining: https://sanchitamangale12.medium.com/scree-plot-733ed72c8608
-# Through the graph, we can tell that 80% of the variance occurs in the first 4-5 principal components.
-# This means we could regulate the amount of principal components to 4 or 5 instead of the original amount of 10.
 
 explained_variance_ratio = svm_pipeline.named_steps['features'].transformers_[0][1].named_steps['pca'].explained_variance_ratio_
 cumulative_explained_variance = explained_variance_ratio.cumsum()
